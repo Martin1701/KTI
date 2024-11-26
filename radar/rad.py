@@ -18,6 +18,7 @@ BAUD_RATE_DAT = 921600
 con_timeout = 0.01
 dat_timeout = 1
 
+configDataPort = f"configDataPort {BAUD_RATE_DAT} 0"
 
 def parse_cfg_file(file_path):
     """
@@ -53,8 +54,11 @@ def configure(port):
             config_commands = parse_cfg_file(RADAR_CONFIG)
             if len(config_commands) == 0: return
 
+            config_commands.insert(-2, configDataPort)
+
             # Send configuration commands to the radar
             for cmd in config_commands:
+
                 ser.write((cmd+"\n").encode())
 
                 if cmd == "sensorStop" or cmd == "sensorStart":
