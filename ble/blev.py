@@ -8,19 +8,19 @@ import math
 import re
 
 class ParsedData:
-    def __init__(self, station, tag, rssi, angle_1, elevation_angle, timestamp, avg_frequency):
+    def __init__(self, station, tag, rssi, azimuth, elevation, timestamp, avg_frequency):
         self.station = station
         self.tag = tag
         self.rssi = rssi
-        self.angle_1 = angle_1
-        self.elevation_angle = elevation_angle
+        self.azimuth = azimuth
+        self.elevation = elevation
         self.timestamp = timestamp
         self.avg_frequency = avg_frequency
 
     def __repr__(self):
         return (f"ParsedData("
                 f"station={self.station}, tag={self.tag}, rssi={self.rssi}, "
-                f"angle_1={self.angle_1}, elevation_angle={self.elevation_angle}, "
+                f"azimuth={self.azimuth}, elevation={self.elevation}, "
                 f"timestamp={self.timestamp}, avg_frequency={self.avg_frequency})")
 
 
@@ -46,8 +46,8 @@ def parse_string(input_string):
         station=int(data['station']),
         tag=int(data['tag']),
         rssi=int(data['rssi']),
-        angle_1=int(data['angle_1']),
-        elevation_angle=int(data['elevation_angle']),
+        azimuth=int(data['azimuth']),
+        elevation=int(data['elevation']),
         timestamp=int(data['timestamp']),
         avg_frequency=float(data['avg_frequency'])
     )
