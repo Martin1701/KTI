@@ -6,15 +6,18 @@ import json
 import threading
 import time
 from collections import defaultdict, deque
+from radar_interface import RadarInterface
+from radar_ui import RadarUI
 
-RADAR_CONFIG = "./tdm/profile_2d_2AzimTx.cfg"
+RADAR_CONFIG = "./tdm/profile_2d_3AzimTx.cfg"
 
 CONFIG_FILE = "config.json"
 BAUD_RATE_CON = 115200
-BAUD_RATE_DAT = 74480 #TODO change
+BAUD_RATE_DAT = 921600
 
-con_timeout = 0.1
+con_timeout = 0.01
 dat_timeout = 1
+
 
 def parse_cfg_file(file_path):
     """
@@ -54,6 +57,9 @@ def configure(port):
             for cmd in config_commands:
                 ser.write((cmd+"\n").encode())
 
+                if cmd == "sensorStop" or cmd == "sensorStart":
+                    time.sleep(.1) # facilitate longer time to execute these commands
+
                 response = ser.readlines()  # Reads all lines as a list of bytes
 
                 response = [line.decode().strip() for line in response]  # Decode and strip newline characters
@@ -64,28 +70,7 @@ def configure(port):
                 else:
                     raise Exception(f"Failed to execute {cmd}\nresponse: {response}")
 
-            print("Configuration commands sent.")
-            
-            print(ser.read(ser.in_waiting))
-
-            # Flush the input buffer to ensure fresh data
-            ser.flushInput()
-
-            # Reading data from the radar
-            print("Reading data from radar...")
-            while True:
-                if ser.in_waiting > 0:
-                    # Read raw data from the serial port
-                    raw_data = ser.read(ser.in_waiting)  # Read all available data
-                    print(f"Raw data received: {raw_data}")  # Print raw bytes for debugging
-                    
-                    # Decode the data and process it
-                    data = raw_data.decode('utf-8', errors='ignore').strip()
-                    print(data)
-                    
-                    # You can add your parsing logic here for elevation, azimuth, and distance
-                else:
-                    time.sleep(0.1)  # Short delay to avoid busy waiting
+            print("\nConfiguration commands sent succesfully.")
 
         except serial.SerialException as e:
             print(f"Error opening serial port: {e}")
@@ -145,6 +130,25 @@ def main():
         port1, port2 = selected_ports
         print(f"Using CONSOLE port: {port1} and DATA port: {port2}")
         configure(port1)
+
+        print("Reading data")
+        radar = RadarInterface(port=port2, baudrate=BAUD_RATE_DAT)
+        radarUI = RadarUI(2, 2)
+        # read the data
+        try:
+            while True:
+                # Read data from the radar
+                raw_data = radar.read_data()
+                
+                if raw_data:
+                    # Parse the radar data
+                    parsed_results = radar.parse_frame(raw_data)
+                    # print(parsed_results)
+                    radarUI.update(parsed_results)
+        except KeyboardInterrupt:
+            print("Exiting...")
+        finally:
+            radar.close()
 
 
 if __name__ == "__main__":
