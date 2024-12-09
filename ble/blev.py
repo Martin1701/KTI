@@ -1,31 +1,30 @@
 import os
 import subprocess
-import tkinter as tk
-import math
 import traceback
-import tkinter as tk
-import math
 import re
+import math
+from collections import defaultdict
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from threading import Thread, Lock
 
 class ParsedData:
-    def __init__(self, station, tag, rssi, angle_1, elevation_angle, timestamp, avg_frequency):
+    def __init__(self, station, tag, rssi, azimuth, elevation, timestamp, avg_frequency):
         self.station = station
         self.tag = tag
         self.rssi = rssi
-        self.angle_1 = angle_1
-        self.elevation_angle = elevation_angle
+        self.azimuth = azimuth
+        self.elevation = elevation
         self.timestamp = timestamp
         self.avg_frequency = avg_frequency
 
     def __repr__(self):
         return (f"ParsedData("
                 f"station={self.station}, tag={self.tag}, rssi={self.rssi}, "
-                f"angle_1={self.angle_1}, elevation_angle={self.elevation_angle}, "
+                f"azimuth={self.azimuth}, elevation={self.elevation}, "
                 f"timestamp={self.timestamp}, avg_frequency={self.avg_frequency})")
 
-
 def parse_string(input_string):
-    # Regex to match each field in the string
     pattern = (
         r"Station:\s*(?P<station>\d+)\s*\|\s*"
         r"Tag:\s*(?P<tag>\d+)\s*\|\s*"
@@ -38,54 +37,138 @@ def parse_string(input_string):
 
     match = re.match(pattern, input_string)
     if not match:
-        raise ValueError("Input string does not match the expected format.")
+        print(f"Skipping line: {input_string.strip()}")  # Debugging output
+        return None
 
-    # Convert matched groups to appropriate types and create ParsedData object
     data = match.groupdict()
     return ParsedData(
         station=int(data['station']),
         tag=int(data['tag']),
         rssi=int(data['rssi']),
-        angle_1=int(data['angle_1']),
-        elevation_angle=int(data['elevation_angle']),
+        azimuth=int(data['azimuth']),
+        elevation=int(data['elevation']),
         timestamp=int(data['timestamp']),
         avg_frequency=float(data['avg_frequency'])
     )
 
+# Global data storage
+positions = {}
+elevations = {}
+lock = Lock()  # To manage thread-safe updates
 
+def calculate_position(parsed_data):
+    """Calculate (x, y) position based on azimuth and RSSI."""
+    r = max(1, 100 + parsed_data.rssi)  # Estimate distance based on RSSI
+    azimuth_rad = math.radians(parsed_data.azimuth)
+
+    x = r * math.cos(azimuth_rad)
+    y = r * math.sin(azimuth_rad)
+    return x, y
+
+def visualization():
+    """Visualize tag positions and elevations."""
+    plt.close('all')  # Ensure no lingering figures
+    fig = plt.figure(figsize=(12, 6))
+    gs = fig.add_gridspec(1, 2, width_ratios=[1, 2])
+    
+    ax_polar = fig.add_subplot(gs[0, 0], projection='polar')  # Polar plot for elevation
+    ax_scatter = fig.add_subplot(gs[0, 1])  # 2D scatter plot for positions
+
+    # Configure scatter plot
+    ax_scatter.set_xlim(-200, 200)
+    ax_scatter.set_ylim(-200, 200)
+    ax_scatter.set_title("Tag Positions", fontsize=12)
+    ax_scatter.set_xlabel("X Position")
+    ax_scatter.set_ylabel("Y Position")
+    ax_scatter.grid(True)
+
+    # Configure polar plot
+    ax_polar.set_theta_zero_location("N")  # North (top) is 0 degrees
+    ax_polar.set_theta_direction(-1)  # Angles increase clockwise
+    ax_polar.set_title("Elevation (Polar Plot)", fontsize=12, pad=20)
+
+    # Update function for animation
+    def update_plot(frame):
+        # Lock data access
+        with lock:
+            current_positions = positions.copy()
+            current_elevations = elevations.copy()
+
+        # Clear scatter plot
+        ax_scatter.clear()
+        ax_scatter.set_xlim(-200, 200)
+        ax_scatter.set_ylim(-200, 200)
+        ax_scatter.set_title("Tag Positions", fontsize=12)
+        ax_scatter.set_xlabel("X Position")
+        ax_scatter.set_ylabel("Y Position")
+        ax_scatter.grid(True)
+
+        # Plot each tag's position in scatter plot
+        for tag, (x, y) in current_positions.items():
+            ax_scatter.scatter(x, y, label=f"Tag {tag}", s=50)
+            ax_scatter.annotate(f"Tag {tag}", (x, y), textcoords="offset points", xytext=(5, 5))
+
+        # Add legend if there are tags
+        if len(current_positions) > 0:
+            ax_scatter.legend(loc="upper right")
+
+        # Clear polar plot
+        ax_polar.clear()
+        ax_polar.set_theta_zero_location("N")
+        ax_polar.set_theta_direction(-1)
+        ax_polar.set_title("Elevation (Polar Plot)", fontsize=12, pad=20)
+
+        # Plot each tag's elevation in the polar plot
+        for tag, (theta, r) in current_elevations.items():
+            ax_polar.scatter(theta, r, label=f"Tag {tag}", s=50)
+
+        # Add polar plot legend
+        if len(current_elevations) > 0:
+            ax_polar.legend(loc="upper right")
+
+    # Start animation
+    ani = FuncAnimation(fig, update_plot, interval=1000, cache_frame_data=False)
+    plt.tight_layout()
+    plt.show()
+
+def calculation(parsed_data):
+    """Update positions and elevations for tags."""
+    x, y = calculate_position(parsed_data)
+    theta = math.radians(parsed_data.azimuth)
+    r = parsed_data.elevation
+
+    # Use lock for thread-safe updates
+    with lock:
+        positions[parsed_data.tag] = (x, y)
+        elevations[parsed_data.tag] = (theta, r)
 
 def run_ble():
     process = subprocess.Popen(
         ['python', '-u', 'ble.py'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,  # Ensures strings (not bytes) are captured
-        bufsize=1   # Line buffering
+        text=True,
+        bufsize=1
     )
 
     try:
-        # Read lines from stdout and stderr
         for stdout_line in process.stdout:
-            if "Station" in stdout_line: # correct message (hopefully)
+            if "Station" in stdout_line:
                 parsed_data = parse_string(stdout_line)
-                #TODO visualisation update code here
-                #TODO pair station data for calculation
-                # (station 1 tag 1) & (station 2 tag 1)
-                # (station 1 tag 2) & (station 2 tag 2)
-                print(parsed_data) 
-
+                if parsed_data:
+                    calculation(parsed_data)
     except KeyboardInterrupt:
         print("Interrupted! Terminating subprocess...")
         process.terminate()
     finally:
-        print(traceback.format_exc())
+        traceback.print_exc()
         process.terminate()
-        process.wait()  # Wait for the subprocess to clean up
-
+        process.wait()
 
 def main():
-    #TODO visualisation create here
-    run_ble()
-            
+    ble_thread = Thread(target=run_ble, daemon=True)
+    ble_thread.start()
+    visualization()
+
 if __name__ == "__main__":
     main()
