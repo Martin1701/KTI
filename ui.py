@@ -12,20 +12,20 @@ from typing import Tuple, Optional, Dict, Deque
 import numpy as np
 import time
 # Configuration constants
-some_constant = 825
+some_constant = 600
 gwm = 6
 ghm = 10
 pixels_per_meter = int(some_constant/ghm)
 
-anchor1_dist = -0.825
+anchor1_dist = -1.8
 anchor2_dist = -anchor1_dist
-radar_dist = 0
+radar_dist = -0.7
 
 rectw = 90
 recth = 40
 
 kpthm = 2
-kpthwm = 1
+kpthwm = 2
 
 azlw = 1
 
@@ -340,9 +340,10 @@ def update_ble(parsed_data):
             ui_elements.elevation1_2 = parsed_data.elevation
             ui_elements.viz.update_object(ui_elements.azimuth1_2)
         update_tag_1_pos()
-        detected =  circle_intersects_box(ui_elements.tag1.x, ui_elements.tag1.y, ui_elements.tag1Radiusm, kpthm, kpthwm)
+        # detected =  circle_intersects_box(ui_elements.tag1.x, ui_elements.tag1.y, ui_elements.tag1Radiusm, kpthm+4, kpthwm+4)
+        detected = ui_elements.tag1.y < 2.5
         if detected and ui_elements.tag1Detected == None:
-                    ui_elements.tag1Detected = ui_elements.viz.add_text(gwm+.5, ghm-1,   "Tag 1 IN!", None, "green2", 40)
+                    ui_elements.tag1Detected = ui_elements.viz.add_text(gwm+2, ghm-1,   "Tag 1 IN!", None, "green2", 40)
         if not detected and ui_elements.tag1Detected != None:
                 ui_elements.viz.remove_object(ui_elements.tag1Detected)
                 ui_elements.tag1Detected = None
@@ -369,16 +370,17 @@ def update_ble(parsed_data):
             ui_elements.elevation2_2 = parsed_data.elevation
             ui_elements.viz.update_object(ui_elements.azimuth2_2)
         update_tag_2_pos()
-        detected =  circle_intersects_box(ui_elements.tag2.x, ui_elements.tag2.y, ui_elements.tag2Radiusm, kpthm, kpthwm)
+        # detected =  circle_intersects_box(ui_elements.tag2.x, ui_elements.tag2.y, ui_elements.tag2Radiusm, kpthm+4, kpthwm+4)
+        detected = ui_elements.tag2.y < 2.5
         if detected and ui_elements.tag2Detected == None:
-                    ui_elements.tag2Detected = ui_elements.viz.add_text(gwm+.5+3, ghm-1,   "Tag 2 IN!", None, "green2", 40)
+                    ui_elements.tag2Detected = ui_elements.viz.add_text(gwm+6, ghm-1,   "Tag 2 IN!", None, "green2", 40)
         if not detected and ui_elements.tag2Detected != None:
                 ui_elements.viz.remove_object(ui_elements.tag2Detected)
                 ui_elements.tag2Detected = None
 
     detected = ((ui_elements.tag1Detected != None) or (ui_elements.tag2Detected != None)) and (ui_elements.radarDetected != None)
     if detected and ui_elements.safeDetected == None:
-        ui_elements.safeDetected = ui_elements.viz.add_text(gwm+.5+9, ghm-1, "   Safe  ", None, "cyan2", 40)
+        ui_elements.safeDetected = ui_elements.viz.add_text(gwm+14, ghm-1, "   Safe  ", None, "cyan2", 40)
     if not detected and ui_elements.safeDetected != None:
         ui_elements.viz.remove_object(ui_elements.safeDetected)
         ui_elements.safeDetected = None
@@ -415,9 +417,9 @@ def update_radar(parsed_data):
         )
     # print(points_in_box)
     if points_in_box >= RADAR_POINTS_TRESHOLD and ui_elements.radarDetected == None:
-        ui_elements.radarDetected = ui_elements.viz.add_text(gwm+.5+6, ghm-1, "  Radar! ", None, "red2", 40)
+        ui_elements.radarDetected = ui_elements.viz.add_text(gwm+10, ghm-1, "  Radar! ", None, "red2", 40)
 
-    if points_in_box == 0 and ui_elements.radarDetected != None:
+    if points_in_box <= 1 and ui_elements.radarDetected != None:
             ui_elements.viz.remove_object(ui_elements.radarDetected)
             ui_elements.radarDetected = None
 
@@ -504,10 +506,10 @@ def main():
 
 
     # for indentation testingfewdsrfews
-    # ui_elements.viz.add_text(gwm+.5, ghm-1,   "Tag 1 IN!", None, "green2", 40)
-    # ui_elements.viz.add_text(gwm+.5+3, ghm-1, "Tag 2 IN!", None, "green2", 40)
-    # ui_elements.viz.add_text(gwm+.5+6, ghm-1, "  Radar! ", None, "red2", 40)
-    # ui_elements.viz.add_text(gwm+.5+9, ghm-1, "   Safe  ", None, "cyan2", 40)
+    # ui_elements.viz.add_text(gwm+2, ghm-1,   "Tag 1 IN!", None, "green2", 40)
+    # ui_elements.viz.add_text(gwm+6, ghm-1, "Tag 2 IN!", None, "green2", 40)
+    # ui_elements.viz.add_text(gwm+10, ghm-1, "  Radar! ", None, "red2", 40)
+    # ui_elements.viz.add_text(gwm+14, ghm-1, "   Safe  ", None, "cyan2", 40)
 
     # Create UI elements for enabled tags
     create_ui_elements_for_tag(1)
