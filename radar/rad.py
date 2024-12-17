@@ -15,6 +15,10 @@ CONFIG_FILE = "config.json"
 BAUD_RATE_CON = 115200
 BAUD_RATE_DAT = 921600
 
+radar_dir = os.path.dirname(os.path.abspath(__file__))
+config_path = os.path.join(radar_dir, CONFIG_FILE)
+radar_config_path = os.path.join(radar_dir, RADAR_CONFIG)
+
 con_timeout = 0.01
 dat_timeout = 1
 
@@ -51,7 +55,7 @@ def configure(port):
         ser.reset_input_buffer()  # Flush input buffer
         try:
             # parse the config file
-            config_commands = parse_cfg_file(RADAR_CONFIG)
+            config_commands = parse_cfg_file(radar_config_path)
             if len(config_commands) == 0: return
 
             config_commands.insert(-2, configDataPort)
@@ -113,9 +117,9 @@ def select_two_ports():
     return selected_ports
 
 def load_or_select_ports():
-    if os.path.exists(CONFIG_FILE):
+    if os.path.exists(config_path):
         try:
-            with open(CONFIG_FILE, 'r') as f:
+            with open(config_path, 'r') as f:
                 config = json.load(f)
                 if "ports" in config and len(config["ports"]) == 2:
                     print("Loaded ports from config:", config["ports"])
@@ -124,9 +128,24 @@ def load_or_select_ports():
             print(f"Error reading config file: {e}")
     selected_ports = select_two_ports()
     if selected_ports:
-        with open(CONFIG_FILE, 'w') as f:
+        with open(config_path, 'w') as f:
             json.dump({"ports": selected_ports}, f)
         print("Saved selected ports to config.")
+
+def print_sensor_data(parsed_data):
+    """
+    Takes the sensor data and prints it in a parseable format to stdout
+    """
+    _, _, _, frame_number, num_det_obj, _, _, detected_x_array, detected_y_array, *_ = parsed_data
+    
+    output_data = {
+        "frame_number": frame_number,
+        "num_det_obj": num_det_obj,
+        "x_coords": detected_x_array,  # Convert numpy array to list if needed
+        "y_coords": detected_y_array
+    }
+    
+    print(json.dumps(output_data))
 
 def main():
     selected_ports = load_or_select_ports()
@@ -137,7 +156,7 @@ def main():
 
         print("Reading data")
         radar = RadarInterface(port=port2, baudrate=BAUD_RATE_DAT)
-        radarUI = RadarUI(2, 2)
+        # radarUI = RadarUI(2, 2)
         # read the data
         try:
             while True:
@@ -148,7 +167,8 @@ def main():
                     # Parse the radar data
                     parsed_results = radar.parse_frame(raw_data)
                     # print(parsed_results)
-                    radarUI.update(parsed_results)
+                    print_sensor_data(parsed_results)
+                    # radarUI.update(parsed_results)
         except KeyboardInterrupt:
             print("Exiting...")
         finally:

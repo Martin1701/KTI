@@ -144,7 +144,7 @@ def calculation(parsed_data):
 
 def run_ble():
     process = subprocess.Popen(
-        ['python', '-u', 'ble.py'],
+        ['python', '-u', './ble/ble.py'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -166,7 +166,7 @@ def run_ble():
         process.wait()
 
 def main():
-    ble_thread = Thread(target=run_ble, daemon=True)
+    ble_thread = Thread(target=run_ble, daemon=False)
     ble_thread.start()
     visualization()
 

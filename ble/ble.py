@@ -16,6 +16,10 @@ DIRECT_PATTERN = re.compile(r'\+UUDF:([0-9A-Fa-f]{12}),(-?\d+),(-?\d+),(-?\d+),(
 
 tag_ids = []
 
+ble_dir = os.path.dirname(os.path.abspath(__file__))
+config_path = os.path.join(ble_dir, CONFIG_FILE)
+
+
 # Initialize dictionaries to hold the latest timestamp, readout time, and frequency data for each station
 freq_data = defaultdict(lambda: {
     "last_timestamp": None,
@@ -107,9 +111,9 @@ def select_two_ports():
     return selected_ports
 
 def load_or_select_ports():
-    if os.path.exists(CONFIG_FILE):
+    if os.path.exists(config_path):
         try:
-            with open(CONFIG_FILE, 'r') as f:
+            with open(config_path, 'r') as f:
                 config = json.load(f)
                 if "ports" in config and len(config["ports"]) == 2:
                     print("Loaded ports from config:", config["ports"])
@@ -118,7 +122,7 @@ def load_or_select_ports():
             print(f"Error reading config file: {e}")
     selected_ports = select_two_ports()
     if selected_ports:
-        with open(CONFIG_FILE, 'w') as f:
+        with open(config_path, 'w') as f:
             json.dump({"ports": selected_ports}, f)
         print("Saved selected ports to config.")
     return selected_ports
