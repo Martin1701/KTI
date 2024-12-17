@@ -35,6 +35,7 @@ class VisualText:
     text: str
     color: str = "white"
     background: str = None
+    text_size: int = None
     id: int = None
     background_id: int = None
 
@@ -351,7 +352,6 @@ class GridVisualizer:
         
         self.lines[line.id] = line.id
 
-
     def _add_text(self, text):
         x_pixels, y_pixels = self.meters_to_pixels(text.x, text.y, use_grid_offset=False)
         
@@ -360,10 +360,14 @@ class GridVisualizer:
             if text.background_id:
                 self.canvas.delete(text.background_id)
         
+        # Use custom size if provided, otherwise use default
+        font_size = text.text_size if text.text_size is not None else self.default_text_size
+        
         temp_text = self.canvas.create_text(
             0, 0,
             text=text.text,
-            anchor='center'
+            anchor='center',
+            font=("Arial", font_size)
         )
         bbox = self.canvas.bbox(temp_text)
         width = bbox[2] - bbox[0]
@@ -386,7 +390,7 @@ class GridVisualizer:
             x_pixels, y_pixels,
             text=text.text,
             fill=text_color,
-            font=("Arial", self.default_text_size),
+            font=("Arial", font_size),
             anchor='center'
         )
         self.texts[text.id] = text.id
@@ -501,8 +505,8 @@ class GridVisualizer:
         self.command_queue.put(('line', (line,)))
         return line
 
-    def add_text(self, x_meters, y_meters, text, color="black", background=None):
-        text_obj = VisualText(x_meters, y_meters, text, color, background)
+    def add_text(self, x_meters, y_meters, text, color="black", background=None, text_size=None):
+        text_obj = VisualText(x_meters, y_meters, text, color, background, text_size)
         self.command_queue.put(('text', (text_obj,)))
         return text_obj
 

@@ -63,7 +63,12 @@ class UI_elements:
 
     keepout: Optional[object] = None
     radarDetected: Optional[object] = None
-    bleDetected: Optional[object] = None
+    tag1Detected: Optional[object] = None
+    tag2Detected: Optional[object] = None
+    safeDetected: Optional[object] = None
+
+    tag1Radiusm: float = 0
+    tag2Radiusm: float = 0
 
     radarPoints: list[Optional[object]] = field(default_factory=lambda: [None, None])
     
@@ -124,7 +129,7 @@ ui_elements = UI_elements()
 smoothing_config = SmoothingConfig()
 tag_configs = {
     1: TagConfig(enabled=True, color="dodgerblue", name="Tag 1"),
-    2: TagConfig(enabled=False, color="firebrick1", name="Tag 2")
+    2: TagConfig(enabled=True, color="firebrick1", name="Tag 2")
 }
 
 def check_points_in_box(cords_x, cords_y, width, height, min_points):
@@ -145,6 +150,38 @@ def check_points_in_box(cords_x, cords_y, width, height, min_points):
             return True
             
     return False
+
+def circle_intersects_box(circle_x, circle_y, radius, box_height, box_width):
+    """
+    Check if a circle intersects with or is inside a box.
+    The box is centered on the Y axis and starts from X=0.
+    
+    Args:
+        circle_x (float): X coordinate of circle center
+        circle_y (float): Y coordinate of circle center
+        radius (float): Circle radius
+        box_height (float): Height of the box
+        box_width (float): Total width of the box (symmetrical along Y axis)
+    
+    Returns:
+        bool: True if circle intersects/touches/is inside box, False otherwise
+    """
+    # Find the half-width since box is symmetrical along Y axis
+    half_width = box_width / 2
+    
+    # Find the closest point on the box to the circle center
+    closest_x = max(0, min(circle_x, box_width))
+    closest_y = max(-box_height/2, min(circle_y, box_height/2))
+    
+    # Find the distance between the closest point and circle center
+    distance_x = circle_x - closest_x
+    distance_y = circle_y - closest_y
+    
+    # Calculate squared distance
+    distance_squared = (distance_x * distance_x) + (distance_y * distance_y)
+    
+    # If distance² is less than or equal to radius², there is intersection
+    return distance_squared <= (radius * radius)
 
 def calculate_tag_position(
     anchor_distance: float,
@@ -253,6 +290,7 @@ def update_tag_1_pos():
         ui_elements.tag1.x = x
         ui_elements.tag1.y = y
         ui_elements.tag1.radius_pixels = radius * pixels_per_meter
+        ui_elements.tag1Radiusm = radius
         ui_elements.viz.update_object(ui_elements.tag1)
 
 def update_tag_2_pos():
@@ -275,6 +313,7 @@ def update_tag_2_pos():
         ui_elements.tag2.x = x
         ui_elements.tag2.y = y
         ui_elements.tag2.radius_pixels = radius * pixels_per_meter
+        ui_elements.tag2Radiusm = radius
         ui_elements.viz.update_object(ui_elements.tag2)
 
 def update_ble(parsed_data):
@@ -301,6 +340,12 @@ def update_ble(parsed_data):
             ui_elements.elevation1_2 = parsed_data.elevation
             ui_elements.viz.update_object(ui_elements.azimuth1_2)
         update_tag_1_pos()
+        detected =  circle_intersects_box(ui_elements.tag1.x, ui_elements.tag1.y, ui_elements.tag1Radiusm, kpthm, kpthwm)
+        if detected and ui_elements.tag1Detected == None:
+                    ui_elements.tag1Detected = ui_elements.viz.add_text(gwm+.5, ghm-1,   "Tag 1 IN!", None, "green2", 40)
+        if not detected and ui_elements.tag1Detected != None:
+                ui_elements.viz.remove_object(ui_elements.tag1Detected)
+                ui_elements.tag1Detected = None
     elif str(parsed_data.tag) == "2" and tag_configs[2].enabled:
         # TAG 2
         if str(parsed_data.station) == "1" and ui_elements.azimuth2_1 is not None:
@@ -324,7 +369,20 @@ def update_ble(parsed_data):
             ui_elements.elevation2_2 = parsed_data.elevation
             ui_elements.viz.update_object(ui_elements.azimuth2_2)
         update_tag_2_pos()
+        detected =  circle_intersects_box(ui_elements.tag2.x, ui_elements.tag2.y, ui_elements.tag2Radiusm, kpthm, kpthwm)
+        if detected and ui_elements.tag2Detected == None:
+                    ui_elements.tag2Detected = ui_elements.viz.add_text(gwm+.5+3, ghm-1,   "Tag 2 IN!", None, "green2", 40)
+        if not detected and ui_elements.tag2Detected != None:
+                ui_elements.viz.remove_object(ui_elements.tag2Detected)
+                ui_elements.tag2Detected = None
 
+    detected = ((ui_elements.tag1Detected != None) or (ui_elements.tag2Detected != None)) and (ui_elements.radarDetected != None)
+    if detected and ui_elements.safeDetected == None:
+        ui_elements.safeDetected = ui_elements.viz.add_text(gwm+.5+9, ghm-1, "   Safe  ", None, "cyan2", 40)
+    if not detected and ui_elements.safeDetected != None:
+        ui_elements.viz.remove_object(ui_elements.safeDetected)
+        ui_elements.safeDetected = None
+        
 def update_radar(parsed_data):
     # delete old points
     for point in ui_elements.radarPoints:
@@ -355,8 +413,9 @@ def update_radar(parsed_data):
                 ""
             )
         )
+    # print(points_in_box)
     if points_in_box >= RADAR_POINTS_TRESHOLD and ui_elements.radarDetected == None:
-        ui_elements.radarDetected = ui_elements.viz.add_text(-1, -2, "Radar detected unexpected person!", "Red")
+        ui_elements.radarDetected = ui_elements.viz.add_text(gwm+.5+6, ghm-1, "  Radar! ", None, "red2", 40)
 
     if points_in_box == 0 and ui_elements.radarDetected != None:
             ui_elements.viz.remove_object(ui_elements.radarDetected)
@@ -439,10 +498,16 @@ def main():
     rect1 = ui_elements.viz.add_rectangle(anchor1_dist, -recth/pixels_per_meter/2, rectw, recth, "yellow", None, 1, "Anchor 1")
     rect2 = ui_elements.viz.add_rectangle(anchor2_dist, -recth/pixels_per_meter/2, rectw, recth, "yellow", None, 1, "Anchor 2")
     # Radar
-    rect3 = ui_elements.viz.add_rectangle(radar_dist, -recth/pixels_per_meter/2*3, rectw, recth, "red", None, 1, "Radar")
+    rect3 = ui_elements.viz.add_rectangle(radar_dist, -recth/pixels_per_meter/2, rectw, recth, "red", None, 1, "Radar") #/2*3 Y axis to put it under ble
     # Radar keepout
     ui_elements.keepout = ui_elements.viz.add_rectangle(radar_dist, kpthm/2, pixels_per_meter*kpthwm, pixels_per_meter*kpthm, None, "Red", 1)
 
+
+    # for indentation testingfewdsrfews
+    # ui_elements.viz.add_text(gwm+.5, ghm-1,   "Tag 1 IN!", None, "green2", 40)
+    # ui_elements.viz.add_text(gwm+.5+3, ghm-1, "Tag 2 IN!", None, "green2", 40)
+    # ui_elements.viz.add_text(gwm+.5+6, ghm-1, "  Radar! ", None, "red2", 40)
+    # ui_elements.viz.add_text(gwm+.5+9, ghm-1, "   Safe  ", None, "cyan2", 40)
 
     # Create UI elements for enabled tags
     create_ui_elements_for_tag(1)
